@@ -6,8 +6,8 @@ config({ path: join(__dirname, '../../.env'), override: true });
 console.log('DATABASE_URL', process.env.DATABASE_URL);
 
 export default defineConfig({
-  schema: 'src/libs/db/schema.ts',
-  out: 'src/libs/db/drizzle',
+  schema: 'libs/db/schemas/index.ts',
+  out: 'libs/db/drizzle',
   dialect: 'postgresql',
   dbCredentials: {
     url: process.env.DATABASE_URL ?? '',
