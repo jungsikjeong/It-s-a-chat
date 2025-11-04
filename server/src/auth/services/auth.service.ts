@@ -4,6 +4,7 @@ import { Inject } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { hash } from 'crypto';
 import { NeonDatabase } from 'drizzle-orm/neon-serverless';
+import type { FastifyReply } from 'fastify';
 import { SigninDto } from '../dto/signin.dto';
 import { SignupDto } from '../dto/signup.dto';
 import {
@@ -11,19 +12,22 @@ import {
   NicknameAlreadyInUseException,
   UserNotFoundException,
 } from '../exceptions/auth.exception';
+import { setAuthCookies } from '../utils/cookies';
+import { TokenService } from './token.service';
 import { UserCheckService } from './user-check.service';
 
 export class AuthService {
   constructor(
     @Inject('DRIZZLE_DB') private readonly db: NeonDatabase<typeof schemas>,
     private readonly userCheckService: UserCheckService,
+    private readonly tokenService: TokenService,
   ) {}
 
   private getClient(tx?: DbTransaction) {
     return tx ?? this.db;
   }
 
-  async signup(signupDto: SignupDto, tx?: DbTransaction) {
+  async signup(signupDto: SignupDto, reply: FastifyReply, tx?: DbTransaction) {
     const client = this.getClient(tx);
 
     const isNicknameAvailable = await this.userCheckService.isNicknameAvailable(
@@ -37,15 +41,18 @@ export class AuthService {
 
     const hashedPassword = await hash('sha256', signupDto.password);
 
-    const user = await client
+    await client
       .insert(tables.users)
       .values({ ...signupDto, password: hashedPassword })
       .returning();
 
-    return user;
+    return {
+      message: 'success',
+      data: {},
+    };
   }
 
-  async signin(signinDto: SigninDto, tx?: DbTransaction) {
+  async signin(signinDto: SigninDto, reply: FastifyReply, tx?: DbTransaction) {
     const client = this.getClient(tx);
 
     const user = await this.userCheckService.findUserByLoginId(
@@ -62,5 +69,22 @@ export class AuthService {
 
     if (!isPasswordValid)
       throw new InvalidPasswordException('비밀번호가 일치하지 않습니다.');
+
+    const { accessToken } = await this.tokenService.generateAccessToken(
+      user.id,
+    );
+    const { refreshToken } = await this.tokenService.generateRefreshToken(
+      user.id,
+    );
+
+    setAuthCookies(reply, accessToken, refreshToken);
+
+    return {
+      message: 'success',
+      data: {
+        accessToken,
+        refreshToken,
+      },
+    };
   }
 }
