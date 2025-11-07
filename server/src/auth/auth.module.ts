@@ -16,11 +16,11 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
       global: true,
       secret: process.env.JWT_SECRET!,
     }),
-    TokenService,
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
+    TokenService,
     UserCheckService,
     JwtAccessStrategy,
     JwtRefreshStrategy,
